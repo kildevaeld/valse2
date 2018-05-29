@@ -82,12 +82,20 @@ func (c *Context) Write(bs []byte) (int, error) {
 }
 
 func (c *Context) PostBody() (bs []byte, err error) {
-	bs, err =  ioutil.ReadAll(c.Request().Body)
+	bs, err = ioutil.ReadAll(c.Request().Body)
 	if err != nil {
 		return bs, err
 	}
-	c.Request().Body.Close();
+	c.Request().Body.Close()
 	return bs, err
+}
+
+func (c *Context) PostJSONBody(v interface{}) error {
+	bs, err := c.PostBody()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bs, v)
 }
 
 func (c *Context) SetUserValue(k string, v interface{}) *Context {
