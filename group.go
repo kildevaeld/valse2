@@ -44,6 +44,10 @@ func (g *Group) Put(path string, handlers ...interface{}) *Group {
 	return g.Route(strong.PUT, path, handlers...)
 }
 
+func (g *Group) Patch(path string, handlers ...interface{}) *Group {
+	return g.Route(strong.PATCH, path, handlers...)
+}
+
 func (g *Group) Delete(path string, handlers ...interface{}) *Group {
 	return g.Route(strong.DELETE, path, handlers...)
 }

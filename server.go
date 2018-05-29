@@ -131,6 +131,10 @@ func (v *Valse) Post(path string, handlers ...interface{}) *Valse {
 	return v.Route(strong.POST, path, handlers...)
 }
 
+func (v *Valse) Patch(path string, handlers ...interface{}) *Valse {
+	return v.Route(strong.PATCH, path, handlers...)
+}
+
 func (v *Valse) Put(path string, handlers ...interface{}) *Valse {
 	return v.Route(strong.PUT, path, handlers...)
 }
@@ -152,12 +156,12 @@ func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
 		return v
 	}
 
-	handler, err :=  v.compose(handlers)
+	handler, err := v.compose(handlers)
 
 	if err != nil {
 		panic(err)
 	}
-	
+
 	v.router.Handle(method, path, v.handleRequest(handler))
 
 	return v
