@@ -9,7 +9,12 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/kildevaeld/strong"
+	"go.uber.org/zap"
 )
+
+type Options struct {
+	Debug bool
+}
 
 type Valse struct {
 	noCopy
@@ -21,10 +26,18 @@ type Valse struct {
 	s *http.Server
 
 	h RequestHandler
+	o *Options
 	//links LinksFactory
 }
 
 func New() *Valse {
+	return NewWithOptions(nil)
+}
+
+func NewWithOptions(o *Options) *Valse {
+	if o == nil {
+		o = &Options{}
+	}
 	v := &Valse{
 		s:      &http.Server{},
 		router: httprouter.New(),
@@ -35,6 +48,7 @@ func New() *Valse {
 				}
 			},
 		},
+		o: o,
 	}
 
 	v.s.Handler = v
@@ -162,6 +176,9 @@ func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
 		panic(err)
 	}
 
+	if v.o.Debug {
+		zap.L().Debug("register route", zap.String("method", method), zap.String("path", path))
+	}
 	v.router.Handle(method, path, v.handleRequest(handler))
 
 	return v
