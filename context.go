@@ -1,9 +1,13 @@
 package valse2
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"regexp"
 
 	"github.com/kildevaeld/strong"
 
@@ -11,12 +15,12 @@ import (
 )
 
 type Context struct {
-	res          http.ResponseWriter
-	req          *http.Request
-	status       int
-	params       httprouter.Params
-	headers_sent bool
-	u            map[string]interface{}
+	res         http.ResponseWriter
+	req         *http.Request
+	status      int
+	params      httprouter.Params
+	headersSent bool
+	u           map[string]interface{}
 }
 
 func (c *Context) Request() *http.Request {
@@ -70,13 +74,13 @@ func (c *Context) HTML(str string) error {
 }
 
 func (c *Context) Write(bs []byte) (int, error) {
-	if !c.headers_sent {
+	if !c.headersSent {
 		status := c.status
 		if status == 0 {
 			status = strong.StatusOK
 		}
 		c.res.WriteHeader(status)
-		c.headers_sent = true
+		c.headersSent = true
 	}
 	return c.res.Write(bs)
 }
@@ -105,6 +109,65 @@ func (c *Context) SetUserValue(k string, v interface{}) *Context {
 
 func (c *Context) UserValue(k string) interface{} {
 	return c.u[k]
+}
+
+type Link struct {
+	Last    int
+	First   int
+	Current int
+	Path    string
+}
+
+var reg = regexp.MustCompile("https?:.*")
+
+const loverheader = 7
+
+func writelink(rel string, url *url.URL) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString("<")
+	buf.WriteString(url.String())
+	buf.WriteString(`>; rel="` + rel + `"`)
+
+	return buf.Bytes()
+}
+
+func (c *Context) SetLinkHeader(l Link) *Context {
+
+	url, err := url.Parse(c.Request().URL.String())
+	if err != nil {
+		panic(err)
+	}
+
+	if l.Path != "" {
+		url.Path = l.Path
+	}
+
+	var links [][]byte
+	var page = "page"
+	args := c.Request().URL.Query()
+
+	args.Set(page, fmt.Sprintf("%d", l.First))
+	links = append(links, writelink("first", url))
+
+	args.Set(page, fmt.Sprintf("%d", l.Current))
+	links = append(links, writelink("current", url))
+
+	if l.Last > l.Current {
+		args.Set(page, fmt.Sprintf("%d", l.Current+1))
+
+		links = append(links, writelink("next", url))
+	}
+	if l.Current > l.First {
+		args.Set(page, fmt.Sprintf("%d", l.Current-1))
+
+		links = append(links, writelink("prev", url))
+	}
+	args.Set(page, fmt.Sprintf("%d", l.Last))
+	url.RawQuery = args.Encode()
+	links = append(links, writelink("last", url))
+
+	c.Header().Set("Link", string(bytes.Join(links, []byte(", "))))
+	return c
 }
 
 func (c *Context) reset() *Context {

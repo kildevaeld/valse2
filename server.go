@@ -23,6 +23,7 @@ type Valse struct {
 
 	m []MiddlewareHandler
 	p sync.Pool
+	r sync.Pool
 	s *http.Server
 
 	h RequestHandler
@@ -48,6 +49,11 @@ func NewWithOptions(o *Options) *Valse {
 				}
 			},
 		},
+		r: sync.Pool{
+			New: func() interface {
+				return &RequestBody{}
+			},
+		},
 		o: o,
 	}
 
@@ -64,7 +70,7 @@ func (v *Valse) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx.req = r
 	ctx.res = w
 
-	defer v.cleanup_context(ctx)
+	defer v.cleanupContext(ctx)
 	if err := v.h(ctx); err != nil {
 		notFoundOrErr(ctx, err)
 	}
@@ -226,21 +232,19 @@ func (v *Valse) toMiddlewareHandler(handler interface{}) (MiddlewareHandler, err
 	switch h := handler.(type) {
 	case func(*Context) error:
 		return mWrapper(h), nil
-	//case func(*fasthttp.RequestCtx):
-	//	return mWrapper(rWrapper(h)), nil
+	case MiddlewareHandler:
+		return h, nil
 	case func(RequestHandler) RequestHandler:
 		return h, nil
 	case func(ctx *Context, next RequestHandler) error:
 		return cWrapper(h), nil
-	case MiddlewareHandler:
-		return h, nil
 
 	default:
 		return nil, errors.New("middleware is of wrong type")
 	}
 }
 
-func (v *Valse) cleanup_context(ctx *Context) {
+func (v *Valse) cleanupContext(ctx *Context) {
 	v.p.Put(ctx.reset())
 }
 
@@ -269,7 +273,7 @@ func (v *Valse) handleRequest(handler RequestHandler) httprouter.Handle {
 		ctx.res = w
 		ctx.params = ps
 
-		defer v.cleanup_context(ctx)
+		defer v.cleanupContext(ctx)
 		if err := handler(ctx); err != nil {
 			notFoundOrErr(ctx, err)
 		}
