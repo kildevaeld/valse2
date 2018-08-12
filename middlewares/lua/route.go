@@ -1,11 +1,13 @@
 package lua
 
 import (
-	"github.com/kildevaeld/valse2"
+	"fmt"
+
+	"github.com/kildevaeld/valse2/httpcontext"
 	"github.com/stevedonovan/luar"
 )
 
-func execute(ctx *valse2.Context, ch chan *VM, id int, middleware bool) bool {
+func execute(ctx *httpcontext.Context, ch chan *VM, id int, middleware bool) bool {
 	req := createRequest(ctx)
 	res := createResponse(ctx)
 
@@ -27,19 +29,18 @@ func execute(ctx *valse2.Context, ch chan *VM, id int, middleware bool) bool {
 	return vm.state.ToBoolean(0)
 }
 
-func route(id int, ch chan *VM) valse2.RequestHandler {
-
-	return func(ctx *valse2.Context) error {
+func route(id int, ch chan *VM) httpcontext.HandlerFunc {
+	return func(ctx *httpcontext.Context) error {
 
 		execute(ctx, ch, id, false)
-
 		return nil
 	}
 }
 
-func middleware(id int, ch chan *VM) valse2.MiddlewareHandler {
-	return func(next valse2.RequestHandler) valse2.RequestHandler {
-		return func(ctx *valse2.Context) error {
+func middleware(id int, ch chan *VM) httpcontext.MiddlewareHandler {
+	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
+		fmt.Printf("HERERERERE\n")
+		return func(ctx *httpcontext.Context) error {
 
 			if execute(ctx, ch, id, true) {
 				return next(ctx)

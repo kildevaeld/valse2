@@ -35,7 +35,18 @@ func wrappedMain() (int, error) {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 
-	server := valse2.New()
+	// log, err := zap.NewDevelopment()
+	// if err != nil {
+	// 	return 0, err
+	// }
+
+	// zap.ReplaceGlobals(log)
+
+	server := valse2.NewWithOptions(&valse2.Options{
+		Debug: true,
+	})
+
+	// server.Use(logger.Logger())
 
 	l := lua.New(server, lua.LuaOptions{
 		Path:      ".",

@@ -1,17 +1,17 @@
 package valse2
 
-type RequestHandler func(*Context) error
+import "github.com/kildevaeld/valse2/httpcontext"
 
-type MiddlewareHandler func(next RequestHandler) RequestHandler
+// type RequestHandler func(*httpcontext.Context) error
 
+// type MiddlewareHandler func(next httpcontext.Context) httpcontext.Context
 
-
-type ValseHTTPHandler interface {
-	ServeHTTP(*Context) error
-}
+// type ValseHTTPHandler interface {
+// 	ServeHTTPContext(*httpcontext.Context) error
+// }
 
 type Route struct {
 	Method  string
 	Path    string
-	Handler RequestHandler
+	Handler httpcontext.HandlerFunc
 }
