@@ -49,11 +49,11 @@ func NewWithOptions(o *Options) *Valse {
 				}
 			},
 		},
-		r: sync.Pool{
-			New: func() interface {
-				return &RequestBody{}
-			},
-		},
+		// r: sync.Pool{
+		// 	New: func() interface {
+		// 		return &RequestBody{}
+		// 	},
+		// },
 		o: o,
 	}
 
@@ -255,7 +255,7 @@ func notFoundOrErr(ctx *Context, err error) error {
 
 	status := http.StatusInternalServerError
 	if e, ok := err.(*strong.HttpError); ok {
-		ctx.Error(e.Message(), e.Code())
+		ctx.Error(e.Message(), e.StatusCode())
 		return nil
 	}
 
