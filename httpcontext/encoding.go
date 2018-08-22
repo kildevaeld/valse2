@@ -3,6 +3,8 @@ package httpcontext
 import (
 	"encoding/json"
 
+	"github.com/vmihailenco/msgpack"
+
 	"github.com/kildevaeld/strong"
 )
 
@@ -15,6 +17,17 @@ func (j *JsonEncoding) Decode(bs []byte, v interface{}) error {
 
 func (j *JsonEncoding) Encode(v interface{}) ([]byte, error) {
 	return json.Marshal(v)
+}
+
+type MsgPackEncoding struct {
+}
+
+func (m *MsgPackEncoding) Decode(bs []byte, v interface{}) error {
+	return msgpack.Unmarshal(bs, v)
+}
+
+func (m *MsgPackEncoding) Encode(v interface{}) ([]byte, error) {
+	return msgpack.Marshal(v)
 }
 
 var (
@@ -31,6 +44,11 @@ func init() {
 	decoders[strong.MIMEApplicationJSONCharsetUTF8] = jsonEncoder
 	encoders[strong.MIMEApplicationJSON] = jsonEncoder
 	encoders[strong.MIMEApplicationJSONCharsetUTF8] = jsonEncoder
+
+	msgPackEncoder := &MsgPackEncoding{}
+	encoders[strong.MIMEApplicationMsgpack] = msgPackEncoder
+	decoders[strong.MIMEApplicationMsgpack] = msgPackEncoder
+
 }
 
 type Decoder interface {
