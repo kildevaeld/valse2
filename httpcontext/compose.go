@@ -64,7 +64,7 @@ func ToMiddlewareHandler(handler interface{}) (MiddlewareHandler, error) {
 		return handlerToMiddleware(httpHandlerToHandler(h)), nil
 	}
 
-	return nil, fmt.Errorf("middleware is of wrong type '%T'", handler)
+	return nil, fmt.Errorf("middleware is of wrong type: '%T'", handler)
 }
 
 func ToHandler(handler interface{}) (HandlerFunc, error) {
@@ -82,7 +82,7 @@ func ToHandler(handler interface{}) (HandlerFunc, error) {
 	case http.Handler:
 		return httpHandlerToHandler(h.ServeHTTP), nil
 	default:
-		return nil, fmt.Errorf("handler is of wrong type '%T'", handler)
+		return nil, fmt.Errorf("handler is of wrong type: '%T'", handler)
 	}
 	return nil, nil
 }
@@ -96,10 +96,9 @@ func Compose(handlers []interface{}) (HandlerFunc, error) {
 		return nil, err
 	}
 
-	var middleware MiddlewareHandler
-
 	if len(handlers) > 1 {
-		for i := len(handlers) - 1; i >= 0; i-- {
+		var middleware MiddlewareHandler
+		for i := len(handlers) - 2; i >= 0; i-- {
 			if middleware, err = ToMiddlewareHandler(handlers[i]); err != nil {
 				return nil, err
 			}
