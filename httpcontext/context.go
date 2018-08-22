@@ -185,11 +185,17 @@ func (c *Context) Redirect(status int, path string) error {
 }
 
 func (c *Context) SetUserValue(k string, v interface{}) *Context {
+	if c.u == nil {
+		c.u = make(map[string]interface{})
+	}
 	c.u[k] = v
 	return c
 }
 
 func (c *Context) UserValue(k string) interface{} {
+	if c.u == nil {
+		return nil
+	}
 	return c.u[k]
 }
 
