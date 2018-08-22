@@ -1,14 +1,17 @@
 package httpcontext
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/kildevaeld/strong"
 )
 
@@ -113,9 +116,9 @@ func (c *Context) Request() *http.Request {
 	return c.req
 }
 
-// func (c *Context) Response() *http.Response {
-// 	return c.res
-// }
+func (c *Context) Response() http.ResponseWriter {
+	return c.res
+}
 
 // Response
 func (c *Context) SetContentType(contentType string) *Context {
@@ -200,6 +203,22 @@ func (c *Context) bytes(bs []byte) error {
 	}
 	c.body = ioutil.NopCloser(bytes.NewBuffer(bs))
 	return nil
+}
+
+func (c *Context) Websocket(upgrader *websocket.Upgrader) (*websocket.Conn, error) {
+	if upgrader == nil {
+		return websocket.Upgrade(c.res, c.req, c.Header(), 1024, 1024)
+	}
+	return upgrader.Upgrade(c.res, c.req, c.Header())
+}
+
+func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijack, ok := c.res.(http.Hijacker)
+	if ok {
+		return nil, nil, http.ErrNotSupported
+	}
+
+	return hijack.Hijack()
 }
 
 func (c *Context) reset() *Context {

@@ -1,12 +1,10 @@
 package httpcontext
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/hashicorp/errwrap"
 	"github.com/kildevaeld/strong"
 )
 
@@ -28,14 +26,6 @@ func handlerToMiddleware(r HandlerFunc) MiddlewareHandler {
 	}
 }
 
-// func httpHandlerToMiddleware(fn http.HandlerFunc) MiddlewareHandler {
-// 	return func(next HandlerFunc) HandlerFunc {
-
-// 		return
-
-// 	}
-// }
-
 func cWrapper(fn func(ctx *Context, next HandlerFunc) error) MiddlewareHandler {
 	return func(next HandlerFunc) HandlerFunc {
 		return func(ctx *Context) error {
@@ -45,6 +35,7 @@ func cWrapper(fn func(ctx *Context, next HandlerFunc) error) MiddlewareHandler {
 }
 
 func httpHandlerToHandler(fn http.HandlerFunc) HandlerFunc {
+
 	return func(ctx *Context) error {
 
 		writer := newwriterWrapper(ctx)
@@ -88,8 +79,10 @@ func ToHandler(handler interface{}) (HandlerFunc, error) {
 		return httpHandlerToHandler(h), nil
 	case http.HandlerFunc:
 		return httpHandlerToHandler(h), nil
+	case http.Handler:
+		return httpHandlerToHandler(h.ServeHTTP), nil
 	default:
-		return nil, errors.New("handler is of wrong type")
+		return nil, fmt.Errorf("handler is of wrong type '%T'", handler)
 	}
 	return nil, nil
 }
@@ -100,7 +93,7 @@ func Compose(handlers []interface{}) (HandlerFunc, error) {
 
 	routeHandler, err := ToHandler(last)
 	if err != nil {
-		return nil, errwrap.Wrapf("RAPPER {err}", err)
+		return nil, err
 	}
 
 	var middleware MiddlewareHandler
@@ -119,16 +112,13 @@ func Compose(handlers []interface{}) (HandlerFunc, error) {
 
 func ComposeRun(w http.ResponseWriter, req *http.Request, handlers []interface{}) error {
 
-	ctx := Acquire(w, req)
-	defer Release(ctx)
-
 	handler, err := Compose(handlers)
 
 	if err != nil {
 		return err
 	}
 
-	return handler(ctx)
+	return Run(w, req, handler)
 
 }
 
@@ -140,6 +130,9 @@ func Run(w http.ResponseWriter, r *http.Request, handler HandlerFunc) error {
 	err := handler(ctx)
 
 	if err != nil {
+		if err == ErrHandled {
+			return nil
+		}
 		return err
 	}
 

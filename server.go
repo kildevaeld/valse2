@@ -1,6 +1,7 @@
 package valse2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,8 +25,8 @@ type Valse struct {
 	m []httpcontext.MiddlewareHandler
 	s *http.Server
 
-	h httpcontext.HandlerFunc
-	o *Options
+	chain httpcontext.HandlerFunc
+	o     *Options
 	//links LinksFactory
 }
 
@@ -49,41 +50,15 @@ func NewWithOptions(o *Options) *Valse {
 }
 
 func (v *Valse) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if v.h == nil {
+	if v.chain == nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	if err := httpcontext.Run(w, r, v.h); err != nil {
+	if err := httpcontext.Run(w, r, v.chain); err != nil {
 		v.handleError(nil, w, r, err)
 		return
 	}
-
-	// ctx := httpcontext.Acquire(w, r)
-	// defer httpcontext.Release(ctx)
-
-	// if err := v.h(ctx); err != nil {
-	// 	v.handleError(ctx, w, r, err)
-	// 	return
-	// }
-
-	// status := ctx.StatusCode()
-	// hasBody := ctx.Body() != nil
-
-	// if !hasBody && status <= 0 {
-	// 	http.NotFound(w, r)
-	// 	return
-	// } else if hasBody && status <= 0 {
-	// 	status = strong.StatusOK
-	// }
-
-	// w.WriteHeader(status)
-	// if hasBody {
-	// 	_, err := io.Copy(w, ctx.Body())
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
 
 }
 
@@ -96,7 +71,7 @@ func (v *Valse) Listen(addr string) error {
 	v.s.Addr = addr
 
 	var err error
-	if v.h, err = v.compose(); err != nil {
+	if v.chain, err = v.compose(); err != nil {
 		return err
 	}
 
@@ -111,12 +86,21 @@ func (v *Valse) compose() (httpcontext.HandlerFunc, error) {
 		handlers[i] = h
 	}
 	handlers[l] = v.router.ServeHTTPContext
-
 	return httpcontext.Compose(handlers)
 }
 
 func (v *Valse) Close() error {
+	if v.s == nil {
+		return nil
+	}
 	return v.s.Close()
+}
+
+func (v *Valse) Shutdown(ctx context.Context) error {
+	if v.s == nil {
+		return nil
+	}
+	return v.s.Shutdown(ctx)
 }
 
 func (v *Valse) Use(handlers ...interface{}) *Valse {
@@ -183,6 +167,23 @@ func (v *Valse) Head(path string, handlers ...interface{}) *Valse {
 
 func (v *Valse) Options(path string, handlers ...interface{}) *Valse {
 	return v.Route(strong.OPTIONS, path, handlers...)
+}
+
+func (v *Valse) WebSocket(path string, handlers ...interface{}) *Valse {
+	handlers = append(handlers[:], func(ctx *httpcontext.Context) error {
+		_, err := ctx.Websocket(nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return v.Route("GET", path, handlers...)
+}
+
+func (c *Valse) ServeFiles(path string, dir http.FileSystem, handlers ...interface{}) *Valse {
+	c.router.ServeFiles(path, dir, handlers...)
+	return c
 }
 
 func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {

@@ -266,18 +266,31 @@ func (r *Router) Handle(method, path string, handle httpcontext.HandlerFunc) {
 // To use the operating system's file system implementation,
 // use http.Dir:
 //     router.ServeFiles("/src/*filepath", http.Dir("/var/www"))
-// func (r *Router) ServeFiles(path string, root http.FileSystem) {
-// 	if len(path) < 10 || path[len(path)-10:] != "/*filepath" {
-// 		panic("path must end with /*filepath in path '" + path + "'")
-// 	}
+func (r *Router) ServeFiles(path string, root http.FileSystem, middlewares ...interface{}) error {
+	if len(path) < 10 || path[len(path)-10:] != "/*filepath" {
+		panic("path must end with /*filepath in path '" + path + "'")
+	}
 
-// 	fileServer := http.FileServer(root)
+	fileServer := http.FileServer(root)
 
-// 	r.GET(path, func(w http.ResponseWriter, req *http.Request, ps Params) {
-// 		req.URL.Path = ps.ByName("filepath")
-// 		fileServer.ServeHTTP(w, req)
-// 	})
-// }
+	handler := func(ctx *httpcontext.Context) error {
+		ctx.Request().URL.Path = ctx.Params().ByName("filepath")
+		fileServer.ServeHTTP(ctx.Response(), ctx.Request())
+		return httpcontext.ErrHandled
+	}
+
+	middlewares = append(middlewares, handler)
+
+	handler, err := httpcontext.Compose(middlewares)
+
+	if err != nil {
+		return err
+	}
+
+	r.GET(path, handler)
+
+	return nil
+}
 
 func (r *Router) recv(ctx *httpcontext.Context) {
 	if rcv := recover(); rcv != nil {
