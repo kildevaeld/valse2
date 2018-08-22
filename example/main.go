@@ -10,7 +10,6 @@ import (
 
 	"github.com/kildevaeld/valse2"
 	"github.com/kildevaeld/valse2/httpcontext"
-	"github.com/kildevaeld/valse2/middlewares/logger"
 
 	system "github.com/kildevaeld/go-system"
 )
@@ -34,7 +33,7 @@ func wrappedMain(kill system.KillChannel) error {
 		Debug: true,
 	})
 
-	server.Use(logger.Logger())
+	//server.Use(logger.Logger())
 
 	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 
