@@ -78,13 +78,6 @@ func (r *RequestBody) Decode(v interface{}) error {
 
 	return decoder.Decode(bs, v)
 
-	// switch r.contentType {
-	// case strong.MIMEApplicationJSON:
-	// 	return json.Unmarshal(bs, v)
-	// default:
-	// 	return fmt.Errorf("cannot decode content type '%s'", r.contentType)
-	// }
-
 }
 
 func (r *RequestBody) reset() *RequestBody {
@@ -161,7 +154,7 @@ func (c *Context) Text(str string) error {
 }
 
 func (c *Context) JSON(v interface{}) error {
-	c.res.Header().Set(strong.HeaderContentType, strong.MIMETextPlain)
+	c.res.Header().Set(strong.HeaderContentType, strong.MIMEApplicationJSONCharsetUTF8)
 
 	bs, err := json.Marshal(v)
 	if err != nil {

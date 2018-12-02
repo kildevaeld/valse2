@@ -71,6 +71,7 @@ func ToHandler(handler interface{}) (HandlerFunc, error) {
 
 	switch h := handler.(type) {
 	case HandlerFunc:
+		return h, nil
 	case func(*Context) error:
 		return h, nil
 	case Handler:
@@ -81,10 +82,9 @@ func ToHandler(handler interface{}) (HandlerFunc, error) {
 		return httpHandlerToHandler(h), nil
 	case http.Handler:
 		return httpHandlerToHandler(h.ServeHTTP), nil
-	default:
-		return nil, fmt.Errorf("handler is of wrong type: '%T'", handler)
+
 	}
-	return nil, nil
+	return nil, fmt.Errorf("handler is of wrong type: '%T'", handler)
 }
 
 func Compose(handlers []interface{}) (HandlerFunc, error) {

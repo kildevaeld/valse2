@@ -1,8 +1,6 @@
 package lua
 
 import (
-	"fmt"
-
 	"github.com/kildevaeld/valse2/httpcontext"
 	"github.com/stevedonovan/luar"
 )
@@ -39,7 +37,6 @@ func route(id int, ch chan *VM) httpcontext.HandlerFunc {
 
 func middleware(id int, ch chan *VM) httpcontext.MiddlewareHandler {
 	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
-		fmt.Printf("HERERERERE\n")
 		return func(ctx *httpcontext.Context) error {
 
 			if execute(ctx, ch, id, true) {

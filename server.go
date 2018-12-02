@@ -3,7 +3,6 @@ package valse2
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"path/filepath"
 
@@ -14,7 +13,8 @@ import (
 )
 
 type Options struct {
-	Debug bool
+	Debug       bool
+	HandleError func(ctx *httpcontext.Context, w http.ResponseWriter, r *http.Request, err error)
 }
 
 type Valse struct {
@@ -50,6 +50,7 @@ func NewWithOptions(o *Options) *Valse {
 }
 
 func (v *Valse) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
 	if v.chain == nil {
 		http.NotFound(w, r)
 		return
@@ -199,7 +200,9 @@ func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
 
 	if v.o.Debug {
 		zap.L().Debug("register route", zap.String("method", method), zap.String("path", path))
+
 	}
+
 	v.router.Handle(method, path, handler)
 
 	return v
@@ -212,6 +215,7 @@ func (v *Valse) handleError(ctx *httpcontext.Context, w http.ResponseWriter, r *
 	} else {
 		http.Error(w, strong.StatusText(strong.StatusInternalServerError), strong.StatusInternalServerError)
 	}
-	fmt.Printf("handle error %#v\n", err)
-
+	if v.o.HandleError != nil {
+		v.o.HandleError(ctx, w, r, err)
+	}
 }

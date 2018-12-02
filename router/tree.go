@@ -331,10 +331,14 @@ func (n *node) insertChild(numParams uint8, path, fullPath string, handle httpco
 // given path.
 func (n *node) getValue(path string) (handle httpcontext.HandlerFunc, p httpcontext.Params, tsr bool) {
 walk: // outer loop for walking the tree
+
 	for {
+
 		if len(path) > len(n.path) {
+
 			if path[:len(n.path)] == n.path {
 				path = path[len(n.path):]
+
 				// If this node does not have a wildcard (param or catchAll)
 				// child,  we can just look up the next child node and continue
 				// to walk down the tree
@@ -351,6 +355,7 @@ walk: // outer loop for walking the tree
 					// We can recommend to redirect to the same URL without a
 					// trailing slash if a leaf exists for that path.
 					tsr = (path == "/" && n.handle != nil)
+
 					return
 
 				}
@@ -418,6 +423,7 @@ walk: // outer loop for walking the tree
 				}
 			}
 		} else if path == n.path {
+
 			// We should have reached the node containing the handle.
 			// Check if this node has a handle registered.
 			if handle = n.handle; handle != nil {
@@ -448,6 +454,7 @@ walk: // outer loop for walking the tree
 		tsr = (path == "/") ||
 			(len(n.path) == len(path)+1 && n.path[len(path)] == '/' &&
 				path == n.path[:len(n.path)-1] && n.handle != nil)
+
 		return
 	}
 }

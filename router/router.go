@@ -349,6 +349,7 @@ func (r *Router) allowed(path, reqMethod string) (allow string) {
 }
 
 func (r *Router) ServeHTTPContext(ctx *httpcontext.Context) error {
+
 	if r.PanicHandler != nil {
 		defer r.recv(ctx)
 	}
@@ -358,8 +359,10 @@ func (r *Router) ServeHTTPContext(ctx *httpcontext.Context) error {
 	path := req.URL.Path
 
 	if root := r.trees[req.Method]; root != nil {
+
 		if handle, ps, tsr := root.getValue(path); handle != nil {
 			ctx.SetParams(ps)
+
 			return handle(ctx)
 
 		} else if req.Method != "CONNECT" && path != "/" {
