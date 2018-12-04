@@ -1,33 +1,32 @@
 package valse2
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"path/filepath"
-	"sync"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/kildevaeld/strong"
+	"github.com/kildevaeld/valse2/httpcontext"
+	"github.com/kildevaeld/valse2/router"
 	"go.uber.org/zap"
 )
 
 type Options struct {
-	Debug bool
+	Debug       bool
+	HandleError func(ctx *httpcontext.Context, w http.ResponseWriter, r *http.Request, err error)
 }
 
 type Valse struct {
 	noCopy
-	router    *httprouter.Router
+	router    *router.Router
 	listening bool
 
-	m []MiddlewareHandler
-	p sync.Pool
-	r sync.Pool
+	m []httpcontext.MiddlewareHandler
 	s *http.Server
 
-	h RequestHandler
-	o *Options
+	chain httpcontext.HandlerFunc
+	o     *Options
 	//links LinksFactory
 }
 
@@ -41,20 +40,8 @@ func NewWithOptions(o *Options) *Valse {
 	}
 	v := &Valse{
 		s:      &http.Server{},
-		router: httprouter.New(),
-		p: sync.Pool{
-			New: func() interface{} {
-				return &Context{
-					u: make(map[string]interface{}),
-				}
-			},
-		},
-		// r: sync.Pool{
-		// 	New: func() interface {
-		// 		return &RequestBody{}
-		// 	},
-		// },
-		o: o,
+		router: router.New(),
+		o:      o,
 	}
 
 	v.s.Handler = v
@@ -63,17 +50,17 @@ func NewWithOptions(o *Options) *Valse {
 }
 
 func (v *Valse) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if v.h == nil {
+
+	if v.chain == nil {
+		http.NotFound(w, r)
 		return
 	}
-	ctx := v.p.Get().(*Context)
-	ctx.req = r
-	ctx.res = w
 
-	defer v.cleanupContext(ctx)
-	if err := v.h(ctx); err != nil {
-		notFoundOrErr(ctx, err)
+	if err := httpcontext.Run(w, r, v.chain); err != nil {
+		v.handleError(nil, w, r, err)
+		return
 	}
+
 }
 
 func (v *Valse) Listen(addr string) error {
@@ -83,19 +70,38 @@ func (v *Valse) Listen(addr string) error {
 	}
 	v.listening = true
 	v.s.Addr = addr
-	handlers := rWrapper(v.router.ServeHTTP)
-	for i := len(v.m) - 1; i >= 0; i-- {
-		handlers = v.m[i](handlers)
-	}
 
-	v.h = handlers
+	var err error
+	if v.chain, err = v.compose(); err != nil {
+		return err
+	}
 
 	return v.s.ListenAndServe()
 
 }
 
+func (v *Valse) compose() (httpcontext.HandlerFunc, error) {
+	l := len(v.m)
+	handlers := make([]interface{}, l+1)
+	for i, h := range v.m {
+		handlers[i] = h
+	}
+	handlers[l] = v.router.ServeHTTPContext
+	return httpcontext.Compose(handlers)
+}
+
 func (v *Valse) Close() error {
+	if v.s == nil {
+		return nil
+	}
 	return v.s.Close()
+}
+
+func (v *Valse) Shutdown(ctx context.Context) error {
+	if v.s == nil {
+		return nil
+	}
+	return v.s.Shutdown(ctx)
 }
 
 func (v *Valse) Use(handlers ...interface{}) *Valse {
@@ -104,24 +110,17 @@ func (v *Valse) Use(handlers ...interface{}) *Valse {
 	}
 
 	for _, handler := range handlers {
-		switch h := handler.(type) {
-		case func(*Context) error:
-			v.m = append(v.m, mWrapper(h))
-		case func(RequestHandler) RequestHandler:
-			v.m = append(v.m, h)
-		case func(ctx *Context, next RequestHandler) error:
-			v.m = append(v.m, cWrapper(h))
-		case MiddlewareHandler:
-			v.m = append(v.m, h)
-		default:
-			panic(fmt.Sprintf("middleware is of wrong type %t", handler))
+		m, err := httpcontext.ToMiddlewareHandler(handler)
+		if err != nil {
+			panic(err)
 		}
+		v.m = append(v.m, m)
 	}
 
 	return v
 }
 
-func cpy(hns []MiddlewareHandler, r RequestHandler) []interface{} {
+func cpy(hns []httpcontext.MiddlewareHandler, r httpcontext.HandlerFunc) []interface{} {
 	out := make([]interface{}, len(hns)+1)
 	for i, rr := range hns {
 		out[i] = rr
@@ -171,12 +170,29 @@ func (v *Valse) Options(path string, handlers ...interface{}) *Valse {
 	return v.Route(strong.OPTIONS, path, handlers...)
 }
 
+func (v *Valse) WebSocket(path string, handlers ...interface{}) *Valse {
+	handlers = append(handlers[:], func(ctx *httpcontext.Context) error {
+		_, err := ctx.Websocket(nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return v.Route("GET", path, handlers...)
+}
+
+func (c *Valse) ServeFiles(path string, dir http.FileSystem, handlers ...interface{}) *Valse {
+	c.router.ServeFiles(path, dir, handlers...)
+	return c
+}
+
 func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
 	if len(handlers) == 0 {
 		return v
 	}
 
-	handler, err := v.compose(handlers)
+	handler, err := httpcontext.Compose(handlers)
 
 	if err != nil {
 		panic(err)
@@ -184,99 +200,22 @@ func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
 
 	if v.o.Debug {
 		zap.L().Debug("register route", zap.String("method", method), zap.String("path", path))
+
 	}
-	v.router.Handle(method, path, v.handleRequest(handler))
+
+	v.router.Handle(method, path, handler)
 
 	return v
 }
 
-func (v *Valse) compose(handlers []interface{}) (RequestHandler, error) {
-	last := handlers[len(handlers)-1]
+func (v *Valse) handleError(ctx *httpcontext.Context, w http.ResponseWriter, r *http.Request, err error) {
 
-	var routeHandler func(ctx *Context) error
-	if fn, ok := last.(func(ctx *Context) error); ok {
-		routeHandler = fn
-	} else if fn, ok := last.(http.Handler); ok {
-		routeHandler = rWrapper(fn.ServeHTTP)
-	} else if fn, ok := last.(http.HandlerFunc); ok {
-		routeHandler = rWrapper(fn)
-	} else if fn, ok := last.(httprouter.Handle); ok {
-		routeHandler = routerWrapper(fn)
-	} else if fn, ok := last.(ValseHTTPHandler); ok {
-		routeHandler = fn.ServeHTTP
-	} else if fn, ok := last.(RequestHandler); ok {
-		routeHandler = fn
+	if httperr, ok := err.(*strong.HttpError); ok {
+		http.Error(w, httperr.Error(), httperr.StatusCode())
 	} else {
-		return nil, errors.New("The last handle must be a RequestHandler or a fasthttp Handler")
+		http.Error(w, strong.StatusText(strong.StatusInternalServerError), strong.StatusInternalServerError)
 	}
-
-	var mHandlers []MiddlewareHandler
-	for _, h := range handlers[:len(handlers)-1] {
-		hh, err := v.toMiddlewareHandler(h)
-		if err != nil {
-			return nil, err
-		}
-		mHandlers = append(mHandlers, hh)
-	}
-
-	for i := len(mHandlers) - 1; i >= 0; i-- {
-		routeHandler = mHandlers[i](routeHandler)
-	}
-
-	// Now compose
-
-	return routeHandler, nil
-}
-
-func (v *Valse) toMiddlewareHandler(handler interface{}) (MiddlewareHandler, error) {
-	switch h := handler.(type) {
-	case func(*Context) error:
-		return mWrapper(h), nil
-	case MiddlewareHandler:
-		return h, nil
-	case func(RequestHandler) RequestHandler:
-		return h, nil
-	case func(ctx *Context, next RequestHandler) error:
-		return cWrapper(h), nil
-
-	default:
-		return nil, errors.New("middleware is of wrong type")
-	}
-}
-
-func (v *Valse) cleanupContext(ctx *Context) {
-	v.p.Put(ctx.reset())
-}
-
-func notFoundOrErr(ctx *Context, err error) error {
-	/*if ctx.Response().Status() == http.StatusNotFound || err == nil {
-		return nil
-	}*/
-
-	status := http.StatusInternalServerError
-	if e, ok := err.(*strong.HttpError); ok {
-		ctx.Error(e.Message(), e.StatusCode())
-		return nil
-	}
-
-	ctx.Error(err.Error(), status)
-
-	return nil
-}
-
-func (v *Valse) handleRequest(handler RequestHandler) httprouter.Handle {
-
-	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-
-		ctx := v.p.Get().(*Context)
-		ctx.req = r
-		ctx.res = w
-		ctx.params = ps
-
-		defer v.cleanupContext(ctx)
-		if err := handler(ctx); err != nil {
-			notFoundOrErr(ctx, err)
-		}
-
+	if v.o.HandleError != nil {
+		v.o.HandleError(ctx, w, r, err)
 	}
 }

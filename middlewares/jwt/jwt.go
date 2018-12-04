@@ -9,7 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/kildevaeld/strong"
-	"github.com/kildevaeld/valse2"
+	"github.com/kildevaeld/valse2/httpcontext"
 )
 
 // Shamefully stolen from the echo framework https://github.com/labstack/echo
@@ -54,7 +54,7 @@ type (
 		keyFunc jwt.Keyfunc
 	}
 
-	jwtExtractor func(*valse2.Context) (string, error)
+	jwtExtractor func(*httpcontext.Context) (string, error)
 )
 
 const (
@@ -89,7 +89,7 @@ var (
 //
 // See: https://jwt.io/introduction
 // See `JWTConfig.TokenLookup`
-func JWT(key []byte) valse2.MiddlewareHandler {
+func JWT(key []byte) httpcontext.MiddlewareHandler {
 	c := DefaultJWTConfig
 	c.SigningKey = key
 	return JWTWithConfig(c)
@@ -97,7 +97,7 @@ func JWT(key []byte) valse2.MiddlewareHandler {
 
 // JWTWithConfig returns a JWT auth middleware with config.
 // See: `JWT()`.
-func JWTWithConfig(config JWTConfig) valse2.MiddlewareHandler {
+func JWTWithConfig(config JWTConfig) httpcontext.MiddlewareHandler {
 	// Defaults
 	/*if config.Skipper == nil {
 		config.Skipper = DefaultJWTConfig.Skipper
@@ -139,8 +139,8 @@ func JWTWithConfig(config JWTConfig) valse2.MiddlewareHandler {
 		extractors = append(extractors, jwtFromCookie(config.TokenLookup.Cookie))
 	}*/
 
-	return func(next valse2.RequestHandler) valse2.RequestHandler {
-		return func(c *valse2.Context) error {
+	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
+		return func(c *httpcontext.Context) error {
 			/*if config.Skipper(c) {
 				return next(c)
 			}*/
@@ -170,7 +170,7 @@ func JWTWithConfig(config JWTConfig) valse2.MiddlewareHandler {
 
 type jwtExtractors []jwtExtractor
 
-func (jwt *jwtExtractors) fromContext(ctx *valse2.Context) (string, error) {
+func (jwt *jwtExtractors) fromContext(ctx *httpcontext.Context) (string, error) {
 
 	var result error
 	for _, extractor := range *jwt {
@@ -187,7 +187,7 @@ func (jwt *jwtExtractors) fromContext(ctx *valse2.Context) (string, error) {
 
 // jwtFromHeader returns a `jwtExtractor` that extracts token from request header.
 func jwtFromHeader(header string) jwtExtractor {
-	return func(c *valse2.Context) (string, error) {
+	return func(c *httpcontext.Context) (string, error) {
 		auth := c.Request().Header.Get(header)
 		l := len(bearer)
 		if len(auth) > l+1 && string(auth[:l]) == bearer {
@@ -199,7 +199,7 @@ func jwtFromHeader(header string) jwtExtractor {
 
 // jwtFromQuery returns a `jwtExtractor` that extracts token from query string.
 func jwtFromQuery(param string) jwtExtractor {
-	return func(c *valse2.Context) (string, error) {
+	return func(c *httpcontext.Context) (string, error) {
 
 		token := c.Request().URL.Query().Get(param)
 		var err error
@@ -211,14 +211,14 @@ func jwtFromQuery(param string) jwtExtractor {
 }
 
 // jwtFromCookie returns a `jwtExtractor` that extracts token from named cookie.
-/*func jwtFromCookie(name string) jwtExtractor {
-	return func(c *valse2.Context) (string, error) {
+// func jwtFromCookie(name string) jwtExtractor {
+// 	return func(c *httpcontext.Context) (string, error) {
 
-		cookie := c.Request().Header.Cookie(name)
-		if len(cookie) == 0 {
-			return "", errors.New("empty jwt in cookie")
-		}
+// 		cookie := c.Request().Header.Cookie(name)
+// 		if len(cookie) == 0 {
+// 			return "", errors.New("empty jwt in cookie")
+// 		}
 
-		return string(cookie), nil
-	}
-}*/
+// 		return string(cookie), nil
+// 	}
+// }

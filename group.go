@@ -1,32 +1,26 @@
 package valse2
 
 import (
-	"fmt"
 	"path/filepath"
+
+	"github.com/kildevaeld/valse2/httpcontext"
 
 	"github.com/kildevaeld/strong"
 )
 
 type Group struct {
-	m      []MiddlewareHandler
+	m      []httpcontext.MiddlewareHandler
 	routes []Route
 }
 
 func (g *Group) Use(handlers ...interface{}) *Group {
 
 	for _, handler := range handlers {
-		switch h := handler.(type) {
-		case func(*Context) error:
-			g.m = append(g.m, mWrapper(h))
-		case func(RequestHandler) RequestHandler:
-			g.m = append(g.m, h)
-		case func(ctx *Context, next RequestHandler) error:
-			g.m = append(g.m, cWrapper(h))
-		case MiddlewareHandler:
-			g.m = append(g.m, h)
-		default:
-			panic(fmt.Sprintf("middleware is of wrong type %t", handler))
+		m, err := httpcontext.ToMiddlewareHandler(handler)
+		if err != nil {
+			panic(err)
 		}
+		g.m = append(g.m, m)
 	}
 
 	return g
@@ -65,7 +59,7 @@ func (g *Group) Route(method, path string, handlers ...interface{}) *Group {
 		return g
 	}
 
-	handler, err := compose(handlers)
+	handler, err := httpcontext.Compose(handlers)
 
 	if err != nil {
 		panic(err)

@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kildevaeld/valse2"
+	"github.com/kildevaeld/valse2/httpcontext"
 
 	system "github.com/kildevaeld/go-system"
 )
@@ -34,16 +35,16 @@ func wrappedMain(kill system.KillChannel) error {
 
 	//server.Use(logger.Logger())
 
-	server.Get("/", func(ctx *valse2.Context, next valse2.RequestHandler) error {
+	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 
 		return next(ctx)
-	}, func(ctx *valse2.Context) error {
+	}, func(ctx *httpcontext.Context) error {
 		return ctx.HTML("<h1>Hello, World</h1>")
 	})
 
-	server.Get("/world/:greeting", func(ctx *valse2.Context) error {
+	server.Get("/world/:greeting", func(ctx *httpcontext.Context) error {
 		return ctx.HTML(fmt.Sprintf("<h1>Hello %s</h1>", ctx.Params().ByName("greeting")))
-	}).Get("/error", func(ctx *valse2.Context) error {
+	}).Get("/error", func(ctx *httpcontext.Context) error {
 		return strong.NewHTTPError(strong.StatusUnauthorized, "test")
 	})
 

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/kildevaeld/strong"
-	"github.com/kildevaeld/valse2"
+	"github.com/kildevaeld/valse2/httpcontext"
 )
 
 // Shamefully stolen from the echo framework https://github.com/labstack/echo
@@ -60,13 +60,13 @@ var (
 
 // CORS returns a Cross-Origin Resource Sharing (CORS) middleware.
 // See: https://developer.mozilla.org/en/docs/Web/HTTP/Access_control_CORS
-func CORS() valse2.MiddlewareHandler {
+func CORS() httpcontext.MiddlewareHandler {
 	return CORSWithConfig(DefaultCORSConfig)
 }
 
 // CORSWithConfig returns a CORS middleware with config.
 // See: `CORS()`.
-func CORSWithConfig(config CORSConfig) valse2.MiddlewareHandler {
+func CORSWithConfig(config CORSConfig) httpcontext.MiddlewareHandler {
 	// Defaults
 	/*if config.Skipper == nil {
 		config.Skipper = DefaultCORSConfig.Skipper
@@ -82,8 +82,8 @@ func CORSWithConfig(config CORSConfig) valse2.MiddlewareHandler {
 	exposeHeaders := strings.Join(config.ExposeHeaders, ",")
 	maxAge := strconv.Itoa(config.MaxAge)
 
-	return func(next valse2.RequestHandler) valse2.RequestHandler {
-		return func(c *valse2.Context) error {
+	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
+		return func(c *httpcontext.Context) error {
 
 			//req := c.Request()
 			//res := c.Response()

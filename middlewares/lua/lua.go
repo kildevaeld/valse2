@@ -1,12 +1,15 @@
 package lua
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/kildevaeld/valse2/httpcontext"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/aarzilli/golua/lua"
@@ -19,7 +22,7 @@ type VM struct {
 	id    int
 }
 
-func createRequest(ctx *valse2.Context) luar.Map {
+func createRequest(ctx *httpcontext.Context) luar.Map {
 	return luar.Map{
 		"header": luar.Map{
 			"get": func(key string) string {
@@ -55,7 +58,9 @@ func createRequest(ctx *valse2.Context) luar.Map {
 	}
 }
 
-func createResponse(ctx *valse2.Context) luar.Map {
+func createResponse(ctx *httpcontext.Context) luar.Map {
+	body := bytes.NewBuffer(nil)
+	ctx.SetBody(ioutil.NopCloser(body))
 	return luar.Map{
 		"header": luar.Map{
 			"get": func(key string) string {
@@ -66,7 +71,7 @@ func createResponse(ctx *valse2.Context) luar.Map {
 			},
 		},
 		"write": func(str string) {
-			ctx.Write([]byte(str))
+			body.Write([]byte(str))
 		},
 		"setStatus": func(status int) {
 			ctx.SetStatusCode(status)
@@ -216,7 +221,13 @@ func (l *LuaValse) Open() error {
 				l.s.Use(middleware(id, ch))
 			} else {
 				logger.Debugf("path '%d' added: '%s'", id, path)
-				l.s.Route(method, path, route(id, ch))
+				l.s.Route(method, path, func(ctx *httpcontext.Context) error {
+
+					fn := route(id, ch)
+
+					return fn(ctx)
+					//return nil
+				})
 			}
 		})
 
