@@ -179,7 +179,7 @@ func (v *Valse) WebSocket(path string, handlers ...interface{}) *Valse {
 		return nil
 	})
 
-	return v.Route("GET", path, handlers...)
+	return v.Route(strong.GET, path, handlers...)
 }
 
 func (c *Valse) ServeFiles(path string, dir http.FileSystem, handlers ...interface{}) *Valse {

@@ -425,12 +425,6 @@ func (r *Router) ServeHTTPContext(ctx *httpcontext.Context) error {
 		}
 	}
 
-	// Handle 404
-	// if r.NotFound != nil {
-	// 	r.NotFound.ServeHTTP(w, req)
-	// } else {
-	// 	http.NotFound(w, req)
-	// }
 	return strong.ErrNotFound
 }
 

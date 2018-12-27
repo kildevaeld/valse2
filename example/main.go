@@ -35,6 +35,11 @@ func wrappedMain(kill system.KillChannel) error {
 
 	//server.Use(logger.Logger())
 
+	go func() {
+		<-kill
+		server.Close()
+	}()
+
 	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 
 		return next(ctx)

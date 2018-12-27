@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/kildevaeld/strong"
 	"github.com/kildevaeld/valse2/httpcontext"
@@ -135,9 +135,9 @@ func JWTWithConfig(config JWTConfig) httpcontext.MiddlewareHandler {
 	if config.TokenLookup.Query != "" {
 		extractors = append(extractors, jwtFromQuery(config.TokenLookup.Query))
 	}
-	/*if config.TokenLookup.Cookie != "" {
+	if config.TokenLookup.Cookie != "" {
 		extractors = append(extractors, jwtFromCookie(config.TokenLookup.Cookie))
-	}*/
+	}
 
 	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
 		return func(c *httpcontext.Context) error {
@@ -210,15 +210,15 @@ func jwtFromQuery(param string) jwtExtractor {
 	}
 }
 
-// jwtFromCookie returns a `jwtExtractor` that extracts token from named cookie.
-// func jwtFromCookie(name string) jwtExtractor {
-// 	return func(c *httpcontext.Context) (string, error) {
+/// jwtFromCookie returns a `jwtExtractor` that extracts token from named cookie.
+func jwtFromCookie(name string) jwtExtractor {
+	return func(c *httpcontext.Context) (string, error) {
 
-// 		cookie := c.Request().Header.Cookie(name)
-// 		if len(cookie) == 0 {
-// 			return "", errors.New("empty jwt in cookie")
-// 		}
+		cookie, err := c.Request().Cookie(name)
+		if err != nil {
+			return "", errors.New("empty jwt in cookie")
+		}
 
-// 		return string(cookie), nil
-// 	}
-// }
+		return cookie.Value, nil
+	}
+}

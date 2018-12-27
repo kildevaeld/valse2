@@ -57,7 +57,9 @@ func (r *RequestBody) Close() error {
 }
 
 func (r *RequestBody) ReadAll() ([]byte, error) {
-	return ioutil.ReadAll(r.reader)
+	bs, err := ioutil.ReadAll(r.reader)
+	r.done = true
+	return bs, err
 }
 
 func (r *RequestBody) Decode(v interface{}) error {
@@ -87,10 +89,10 @@ func (r *RequestBody) reset() *RequestBody {
 }
 
 type Context struct {
-	req      *http.Request
-	req_body *RequestBody
-	params   Params
-	res      http.ResponseWriter
+	req     *http.Request
+	reqBody *RequestBody
+	params  Params
+	res     http.ResponseWriter
 
 	body   io.ReadCloser
 	status int
@@ -140,12 +142,12 @@ func (c *Context) StatusCode() int {
 }
 
 func (c *Context) RequestBody() *RequestBody {
-	if c.req_body == nil {
-		c.req_body = requestPool.Get().(*RequestBody)
-		c.req_body.reader = c.req.Body
-		c.req_body.contentType = c.req.Header.Get(strong.HeaderContentType)
+	if c.reqBody == nil {
+		c.reqBody = requestPool.Get().(*RequestBody)
+		c.reqBody.reader = c.req.Body
+		c.reqBody.contentType = c.req.Header.Get(strong.HeaderContentType)
 	}
-	return c.req_body
+	return c.reqBody
 }
 
 func (c *Context) Text(str string) error {
@@ -167,6 +169,36 @@ func (c *Context) JSON(v interface{}) error {
 func (c *Context) HTML(str string) error {
 	c.res.Header().Set(strong.HeaderContentType, strong.MIMETextHTMLCharsetUTF8)
 	return c.bytes([]byte(str))
+}
+
+func (c *Context) Bytes(bs []byte) error {
+	c.res.Header().Set(strong.HeaderContentType, strong.MIMEOctetStream)
+	return c.Bytes(bs)
+}
+
+func (c *Context) bytes(bs []byte) error {
+	if c.body != nil {
+		c.body.Close()
+	}
+	c.body = ioutil.NopCloser(bytes.NewBuffer(bs))
+	return nil
+}
+
+// ResponseWriter
+func (c *Context) Write(bs []byte) (int, error) {
+	if c.body == nil {
+		c.body = ioutil.NopCloser(bytes.NewBuffer(nil))
+	}
+
+	if writer, ok := c.body.(io.Writer); ok {
+		return writer.Write(bs)
+	}
+
+	return 0, fmt.Errorf("body not a writer")
+}
+
+func (c *Context) WriteHeader(statusCode int) {
+	c.status = statusCode
 }
 
 func (c *Context) Error(status int, msg ...interface{}) error {
@@ -196,14 +228,6 @@ func (c *Context) Header() http.Header {
 	return c.res.Header()
 }
 
-func (c *Context) bytes(bs []byte) error {
-	if c.body != nil {
-		c.body.Close()
-	}
-	c.body = ioutil.NopCloser(bytes.NewBuffer(bs))
-	return nil
-}
-
 func (c *Context) Websocket(upgrader *websocket.Upgrader) (*websocket.Conn, error) {
 	if upgrader == nil {
 		return websocket.Upgrade(c.res, c.req, c.Header(), 1024, 1024)
@@ -222,11 +246,11 @@ func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func (c *Context) reset() *Context {
 	c.req = nil
-	if c.req_body != nil {
-		c.req_body.Close()
-		requestPool.Put(c.req_body.reset())
+	if c.reqBody != nil {
+		c.reqBody.Close()
+		requestPool.Put(c.reqBody.reset())
 	}
-	c.req_body = nil
+	c.reqBody = nil
 	c.res = nil
 	c.params = nil
 	c.u = nil

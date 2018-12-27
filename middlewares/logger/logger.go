@@ -18,22 +18,24 @@ func LoggerWithZap(log *zap.Logger) httpcontext.MiddlewareHandler {
 		return func(ctx *httpcontext.Context) error {
 			start := time.Now()
 
-			entry := log.With(zap.String("request", string(ctx.Request().URL.String())),
-				zap.String("method", ctx.Request().Method),
-				zap.String("remote", ctx.Request().RemoteAddr))
+			req := ctx.Request()
 
-			if reqID := ctx.Request().Header.Get("X-Request-Id"); reqID != "" {
-				entry = entry.With(zap.String("request_id", string(reqID)))
+			entry := log.With(zap.String("request", req.URL.String()),
+				zap.String("method", req.Method),
+				zap.String("remote", req.RemoteAddr))
+
+			if reqID := req.Header.Get("X-Request-Id"); reqID != "" {
+				entry = entry.With(zap.String("request_id", reqID))
 			}
 
-			entry.Debug("started handling request")
+			entry.Info("started handling request")
 			if err := next(ctx); err != nil {
 				return err
 			}
 
 			latency := time.Since(start)
 
-			entry.Debug("completed handling request",
+			entry.Info("completed handling request",
 				zap.Int("status", ctx.StatusCode()),
 				zap.String("text_status", strong.StatusText(ctx.StatusCode())),
 				zap.Duration("took", latency),
