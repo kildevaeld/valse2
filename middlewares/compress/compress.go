@@ -1,12 +1,12 @@
 package gzip
 
 import (
-	"github.com/kildevaeld/valse2"
+	"github.com/kildevaeld/valse2/httpcontext"
 )
 
-func GzipWithConfig() valse2.MiddlewareHandler {
-	return func(next valse2.RequestHandler) valse2.RequestHandler {
-		return func(c *valse2.Context) error {
+func GzipWithConfig() httpcontext.MiddlewareHandler {
+	return func(next httpcontext.HandlerFunc) httpcontext.HandlerFunc {
+		return func(c *httpcontext.Context) error {
 			return nil
 		}
 	}

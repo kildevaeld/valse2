@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 
 	system "github.com/kildevaeld/go-system"
@@ -41,12 +40,12 @@ func wrappedMain(kill system.KillChannel) error {
 		Debug: true,
 	})
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
+	//cwd, err := os.Getwd()
+	//if err != nil {
+	//		return err
+	//	}
 
-	server.ServeFiles("/*filepath", http.Dir(cwd))
+	//server.ServeFiles("/*filepath", http.Dir(cwd))
 	zap.L().Info("Started server and listening", zap.String("address", *address))
 	return server.Listen(*address)
 }

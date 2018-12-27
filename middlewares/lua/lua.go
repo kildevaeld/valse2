@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/kildevaeld/valse2/httpcontext"
+	"go.uber.org/zap"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/aarzilli/golua/lua"
 	"github.com/kildevaeld/valse2"
 	"github.com/stevedonovan/luar"
@@ -93,7 +93,7 @@ type File struct {
 
 type RouterFactory func(method, path string, id int)
 
-func createLua(options LuaOptions, logger logrus.FieldLogger, files []File, factory RouterFactory) (*lua.State, error) {
+func createLua(options LuaOptions, logger *zap.Logger, files []File, factory RouterFactory) (*lua.State, error) {
 	var L *lua.State
 
 	if options.LuaFactory != nil {
@@ -123,13 +123,13 @@ func createLua(options LuaOptions, logger logrus.FieldLogger, files []File, fact
 	L.DoString(string(MustAsset("prelude.lua")))
 
 	for _, file := range files {
-		logger.Debugf("reading file %s", file.Path)
+		logger.Debug("reading file", zap.String("path", file.Path))
 		err := L.DoString(file.Content)
 		if err != nil {
 			if options.StopOnError {
 				return nil, err
 			}
-			logger.WithError(err).Errorf("could not load file: %s", file.Path)
+			logger.Error("could not load file", zap.String("path", file.Path), zap.Error(err))
 		}
 
 	}
@@ -177,18 +177,17 @@ type LuaValse struct {
 }
 
 func (l LuaValse) loadFiles() []File {
-	logger := logrus.WithField("prefix", "middlewares:lua")
 
 	files, err := getSortedFiles(l.o.Path)
 	if err != nil {
-		logger.Fatal(err)
+		zap.L().Fatal("load files", zap.Error(err))
 	}
 	var out []File
 	for _, file := range files {
 
 		bs, err := ioutil.ReadFile(file)
 		if err != nil {
-			logger.Fatal(err)
+			zap.L().Fatal("load files", zap.Error(err))
 		}
 		out = append(out, File{
 			Path:    file,
@@ -204,12 +203,12 @@ func (l *LuaValse) Open() error {
 		wn = 5
 	}
 
-	logger := logrus.WithField("prefix", "middleware:lua")
+	logger := zap.L()
 
 	files := l.loadFiles()
 
 	ch := make(chan *VM, wn+1)
-	logger.Infof("Registering %d lua vm's", wn)
+	logger.Debug("Registering lua virtualmchaines", zap.Int("count", wn))
 	for i := 0; i < wn; i++ {
 		lua, err := createLua(l.o, logger, files, func(method, path string, id int) {
 			if id <= l.id {
@@ -217,10 +216,10 @@ func (l *LuaValse) Open() error {
 			}
 			l.id = id
 			if method == "" {
-				logger.Debugf("middleware '%d' added", id)
+				logger.Debug("middleware  added", zap.Int("id", id))
 				l.s.Use(middleware(id, ch))
 			} else {
-				logger.Debugf("path '%d' added: '%s'", id, path)
+				logger.Debug("path '%d' added: '%s'", zap.Int("id", id), zap.String("path", path))
 				l.s.Route(method, path, func(ctx *httpcontext.Context) error {
 
 					fn := route(id, ch)
