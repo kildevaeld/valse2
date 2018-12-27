@@ -78,9 +78,9 @@ func wrappedMain(kill system.KillChannel) error {
 	server.Mount("/api/blog", valse2.NewRest("blog").Create(func(ctx *httpcontext.Context) error {
 
 		return ctx.JSON(dict.Map{})
-	}).List(func(ctx *httpcontext.Context) error {
+	}).Get(func(ctx *httpcontext.Context, id string) error {
 		return ctx.JSON(dict.Map{
-			"hello": "world",
+			"hello": "world " + id,
 		})
 	}))
 

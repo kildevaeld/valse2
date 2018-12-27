@@ -36,8 +36,18 @@ func LoggerWithZap(log *zap.Logger) httpcontext.MiddlewareHandler {
 
 			latency := time.Since(start)
 
+			status := ctx.StatusCode()
+			hasBody := ctx.Body() != nil
+			if status == 0 {
+				if hasBody {
+					status = strong.StatusOK
+				} else {
+					status = strong.StatusNotFound
+				}
+			}
+
 			entry.Info("completed handling request",
-				zap.Int("status", ctx.StatusCode()),
+				zap.Int("status", status),
 				zap.String("text_status", strong.StatusText(ctx.StatusCode())),
 				zap.Duration("took", latency),
 				zap.Int64("measure#.latency", latency.Nanoseconds()))
