@@ -9,6 +9,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
+	"regexp"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -243,6 +245,65 @@ func (c *Context) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	}
 
 	return hijack.Hijack()
+}
+
+type Link struct {
+	Last    int
+	First   int
+	Current int
+	Path    string
+}
+
+var reg = regexp.MustCompile("https?:.*")
+
+const loverheader = 7
+
+func writelink(rel string, url *url.URL) []byte {
+	buf := bytes.NewBuffer(nil)
+	buf.WriteString("<")
+	buf.WriteString(url.String())
+	buf.WriteString(`>; rel="` + rel + `"`)
+
+	return buf.Bytes()
+}
+
+func (c *Context) SetLinkHeader(l Link) *Context {
+
+	url, err := url.Parse(c.Request().URL.String())
+	if err != nil {
+		panic(err)
+	}
+
+	if l.Path != "" {
+		url.Path = l.Path
+	}
+
+	var links [][]byte
+	var page = "page"
+	args := c.Request().URL.Query()
+
+	args.Set(page, fmt.Sprintf("%d", l.First))
+	links = append(links, writelink("first", url))
+
+	args.Set(page, fmt.Sprintf("%d", l.Current))
+	links = append(links, writelink("current", url))
+
+	if l.Last > l.Current {
+		args.Set(page, fmt.Sprintf("%d", l.Current+1))
+
+		links = append(links, writelink("next", url))
+	}
+	if l.Current > l.First {
+		args.Set(page, fmt.Sprintf("%d", l.Current-1))
+
+		links = append(links, writelink("prev", url))
+	}
+	args.Set(page, fmt.Sprintf("%d", l.Last))
+	url.RawQuery = args.Encode()
+	links = append(links, writelink("last", url))
+
+	c.Header().Set(strong.HeaderLink, string(bytes.Join(links, []byte(", "))))
+	return c
 }
 
 func (c *Context) reset() *Context {
