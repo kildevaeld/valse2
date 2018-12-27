@@ -30,6 +30,7 @@ func LoggerWithZap(log *zap.Logger) httpcontext.MiddlewareHandler {
 
 			entry.Info("started handling request")
 			if err := next(ctx); err != nil {
+				entry.Info("request failed", zap.Error(err))
 				return err
 			}
 

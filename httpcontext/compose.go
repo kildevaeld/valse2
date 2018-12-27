@@ -67,7 +67,7 @@ func ToMiddlewareHandler(handler interface{}) (MiddlewareHandler, error) {
 	return nil, fmt.Errorf("middleware is of wrong type: '%T'", handler)
 }
 
-func ToHandler(handler interface{}) (HandlerFunc, error) {
+func ToHandlerFunc(handler interface{}) (HandlerFunc, error) {
 
 	switch h := handler.(type) {
 	case HandlerFunc:
@@ -91,7 +91,7 @@ func Compose(handlers []interface{}) (HandlerFunc, error) {
 
 	last := handlers[len(handlers)-1]
 
-	routeHandler, err := ToHandler(last)
+	routeHandler, err := ToHandlerFunc(last)
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +147,7 @@ func Run(w http.ResponseWriter, r *http.Request, handler HandlerFunc) error {
 
 	w.WriteHeader(status)
 	if hasBody {
+		defer ctx.Body().Close()
 		_, err := io.Copy(w, ctx.Body())
 		if err != nil {
 			return err

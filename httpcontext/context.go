@@ -128,7 +128,7 @@ func (c *Context) SetBody(v io.ReadCloser) *Context {
 	return c
 }
 
-func (c *Context) Body() io.Reader {
+func (c *Context) Body() io.ReadCloser {
 	return c.body
 }
 
@@ -180,6 +180,7 @@ func (c *Context) bytes(bs []byte) error {
 	if c.body != nil {
 		c.body.Close()
 	}
+	c.Header().Set(strong.HeaderContentLength, fmt.Sprintf("%d", len(bs)))
 	c.body = ioutil.NopCloser(bytes.NewBuffer(bs))
 	return nil
 }
@@ -254,6 +255,10 @@ func (c *Context) reset() *Context {
 	c.res = nil
 	c.params = nil
 	c.u = nil
+	if c.body != nil {
+		c.body.Close()
+	}
+	c.body = nil
 	return c
 }
 

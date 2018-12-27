@@ -2,6 +2,8 @@ package cache
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/kildevaeld/strong"
 	"github.com/kildevaeld/valse2/httpcontext"
@@ -31,7 +33,7 @@ func NewCacheControl(options *CacheControl) httpcontext.MiddlewareHandler {
 
 			if err := next(ctx); err != nil {
 				return err
-			} else if !strong.IsSuccess(ctx.StatusCode()) {
+			} else if !(strong.IsSuccess(ctx.StatusCode()) || ctx.StatusCode() == 0) {
 				return nil
 			}
 
@@ -40,7 +42,16 @@ func NewCacheControl(options *CacheControl) httpcontext.MiddlewareHandler {
 				scope = "private"
 			}
 
-			ctx.Header().Set(strong.HeaderCacheControl, fmt.Sprintf(scope+" max-age=%d", maxAge))
+			cacheCtrl := ctx.Request().Header.Get(strong.HeaderCacheControl)
+			if cacheCtrl != "" && strings.ToLower(cacheCtrl) == "no-cache" {
+				return nil
+			}
+
+			ctx.Header().Set(strong.HeaderCacheControl, fmt.Sprintf(scope+", max-age=%d", maxAge))
+
+			now := time.Now().Add(time.Duration(maxAge) * time.Second)
+
+			ctx.Header().Set("expires", now.Format(time.RFC1123))
 
 			return nil
 		}

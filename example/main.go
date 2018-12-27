@@ -2,16 +2,19 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
+	"github.com/kildevaeld/dict"
 	"github.com/kildevaeld/strong"
 
 	"go.uber.org/zap"
 
 	"github.com/kildevaeld/valse2"
 	"github.com/kildevaeld/valse2/httpcontext"
-	"github.com/kildevaeld/valse2/middlewares/logger"
+	"github.com/kildevaeld/valse2/middlewares/cache"
 	mpanic "github.com/kildevaeld/valse2/middlewares/panic"
+	"github.com/kildevaeld/valse2/mountables/filesystem"
 
 	system "github.com/kildevaeld/go-system"
 )
@@ -43,12 +46,12 @@ func wrappedMain(kill system.KillChannel) error {
 	}()
 
 	server.Use(mpanic.New())
-	server.Use(logger.Logger())
+	//server.Use(logger.Logger())
 
 	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 
 		return next(ctx)
-	}, func(ctx *httpcontext.Context) error {
+	}, cache.NewCacheControl(nil), func(ctx *httpcontext.Context) error {
 		return ctx.HTML("<h1>Hello, World</h1>")
 	})
 
@@ -61,6 +64,32 @@ func wrappedMain(kill system.KillChannel) error {
 		return nil
 	})
 
-	return server.Listen(":3000")
+	group := valse2.NewGroup()
+	group.Use(func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
+		fmt.Println("hello from middleware")
+		defer println("hello from middleware again")
+		return next(ctx)
+	}).Get("/", func(ctx *httpcontext.Context) error {
+		return ctx.Text(fmt.Sprintf("Ob la di ob la da %s", ctx.Request().URL))
+	})
+
+	server.Mount("/test/group", group)
+
+	server.Mount("/api/blog", valse2.NewRest("blog").Create(func(ctx *httpcontext.Context) error {
+
+		return ctx.JSON(dict.Map{})
+	}).List(func(ctx *httpcontext.Context) error {
+		return ctx.JSON(dict.Map{
+			"hello": "world",
+		})
+	}))
+
+	server.Mount("/files", filesystem.New(http.Dir("./")), cache.NewCacheControl(&cache.CacheControl{
+		Debug:   false,
+		Private: false,
+		MaxAge:  20000000,
+	}))
+
+	return server.Listen(":4000")
 
 }

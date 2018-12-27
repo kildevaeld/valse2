@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"path/filepath"
 
 	"github.com/kildevaeld/strong"
 	"github.com/kildevaeld/valse2/httpcontext"
-	"github.com/kildevaeld/valse2/router"
 	"go.uber.org/zap"
 )
 
@@ -19,10 +17,10 @@ type Options struct {
 
 type Valse struct {
 	noCopy
-	router    *router.Router
+	group     *Group
 	listening bool
 
-	m []httpcontext.MiddlewareHandler
+	//m []httpcontext.MiddlewareHandler
 	s *http.Server
 
 	chain httpcontext.HandlerFunc
@@ -39,9 +37,9 @@ func NewWithOptions(o *Options) *Valse {
 		o = &Options{}
 	}
 	v := &Valse{
-		s:      &http.Server{},
-		router: router.New(),
-		o:      o,
+		s:     &http.Server{},
+		group: NewGroup(),
+		o:     o,
 	}
 
 	v.s.Handler = v
@@ -84,13 +82,7 @@ func (v *Valse) Listen(addr string) error {
 }
 
 func (v *Valse) compose() (httpcontext.HandlerFunc, error) {
-	l := len(v.m)
-	handlers := make([]interface{}, l+1)
-	for i, h := range v.m {
-		handlers[i] = h
-	}
-	handlers[l] = v.router.ServeHTTPContext
-	return httpcontext.Compose(handlers)
+	return v.group.Compose("")
 }
 
 func (v *Valse) Close() error {
@@ -108,18 +100,7 @@ func (v *Valse) Shutdown(ctx context.Context) error {
 }
 
 func (v *Valse) Use(handlers ...interface{}) *Valse {
-	if v.listening {
-		panic("cannot add middleware when running.")
-	}
-
-	for _, handler := range handlers {
-		m, err := httpcontext.ToMiddlewareHandler(handler)
-		if err != nil {
-			panic(err)
-		}
-		v.m = append(v.m, m)
-	}
-
+	v.group.Use(handlers...)
 	return v
 }
 
@@ -133,15 +114,8 @@ func cpy(hns []httpcontext.MiddlewareHandler, r httpcontext.HandlerFunc) []inter
 	return out
 }
 
-func (v *Valse) Mount(path string, group *Group) *Valse {
-	for _, route := range group.routes {
-		p := route.Path
-		if path != "" {
-			p = filepath.Join(path, route.Path)
-		}
-
-		v.Route(route.Method, p, cpy(group.m, route.Handler)...)
-	}
+func (v *Valse) Mount(path string, group Mountable, middleware ...interface{}) *Valse {
+	v.group.Mount(path, group, middleware...)
 	return v
 }
 
@@ -185,28 +159,9 @@ func (v *Valse) WebSocket(path string, handlers ...interface{}) *Valse {
 	return v.Route(strong.GET, path, handlers...)
 }
 
-func (c *Valse) ServeFiles(path string, dir http.FileSystem, handlers ...interface{}) *Valse {
-	c.router.ServeFiles(path, dir, handlers...)
-	return c
-}
-
 func (v *Valse) Route(method, path string, handlers ...interface{}) *Valse {
-	if len(handlers) == 0 {
-		return v
-	}
 
-	handler, err := httpcontext.Compose(handlers)
-
-	if err != nil {
-		panic(err)
-	}
-
-	if v.o.Debug {
-		zap.L().Debug("register route", zap.String("method", method), zap.String("path", path))
-
-	}
-
-	v.router.Handle(method, path, handler)
+	v.group.Route(method, path, handlers...)
 
 	return v
 }

@@ -7,3 +7,15 @@ type Handler interface {
 }
 
 type MiddlewareHandler func(next HandlerFunc) HandlerFunc
+
+type handlerFuncWrap struct {
+	fn HandlerFunc
+}
+
+func (h *handlerFuncWrap) ServeHTTPContext(ctx *Context) error {
+	return h.fn(ctx)
+}
+
+func ToHandler(fn HandlerFunc) Handler {
+	return &handlerFuncWrap{fn}
+}
