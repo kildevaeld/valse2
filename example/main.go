@@ -10,6 +10,8 @@ import (
 
 	"github.com/kildevaeld/valse2"
 	"github.com/kildevaeld/valse2/httpcontext"
+	"github.com/kildevaeld/valse2/middlewares/logger"
+	mpanic "github.com/kildevaeld/valse2/middlewares/panic"
 
 	system "github.com/kildevaeld/go-system"
 )
@@ -40,6 +42,9 @@ func wrappedMain(kill system.KillChannel) error {
 		server.Close()
 	}()
 
+	server.Use(mpanic.New())
+	server.Use(logger.Logger())
+
 	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 
 		return next(ctx)
@@ -51,6 +56,9 @@ func wrappedMain(kill system.KillChannel) error {
 		return ctx.HTML(fmt.Sprintf("<h1>Hello %s</h1>", ctx.Params().ByName("greeting")))
 	}).Get("/error", func(ctx *httpcontext.Context) error {
 		return strong.NewHTTPError(strong.StatusUnauthorized, "test")
+	}).Get("/panic", func(ctx *httpcontext.Context) error {
+		panic("oh ooohhh")
+		return nil
 	})
 
 	return server.Listen(":3000")

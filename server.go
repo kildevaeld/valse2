@@ -75,7 +75,10 @@ func (v *Valse) Listen(addr string) error {
 	if v.chain, err = v.compose(); err != nil {
 		return err
 	}
+	if v.o.Debug {
+		zap.L().Debug("listening on", zap.String("addr", addr))
 
+	}
 	return v.s.ListenAndServe()
 
 }
