@@ -316,6 +316,8 @@ func (c *Context) reset() *Context {
 	c.res = nil
 	c.params = nil
 	c.u = nil
+	c.status = 0
+
 	if c.body != nil {
 		c.body.Close()
 	}
