@@ -283,19 +283,21 @@ func (c *Context) SetLinkHeader(l Link) *Context {
 	args := c.Request().URL.Query()
 
 	args.Set(page, fmt.Sprintf("%d", l.First))
+	url.RawQuery = args.Encode()
 	links = append(links, writelink("first", url))
 
 	args.Set(page, fmt.Sprintf("%d", l.Current))
+	url.RawQuery = args.Encode()
 	links = append(links, writelink("current", url))
 
 	if l.Last > l.Current {
 		args.Set(page, fmt.Sprintf("%d", l.Current+1))
-
+		url.RawQuery = args.Encode()
 		links = append(links, writelink("next", url))
 	}
 	if l.Current > l.First {
 		args.Set(page, fmt.Sprintf("%d", l.Current-1))
-
+		url.RawQuery = args.Encode()
 		links = append(links, writelink("prev", url))
 	}
 	args.Set(page, fmt.Sprintf("%d", l.Last))
