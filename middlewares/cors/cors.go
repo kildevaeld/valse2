@@ -133,7 +133,7 @@ func CORSWithConfig(config CORSConfig) httpcontext.MiddlewareHandler {
 				c.Header().Set(strong.HeaderAccessControlMaxAge, maxAge)
 			}
 
-			return nil
+			return next(c)
 		}
 	}
 }
