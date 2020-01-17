@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/kildevaeld/valse2/middlewares/cors"
+
 	"github.com/kildevaeld/dict"
 	"github.com/kildevaeld/strong"
 
@@ -47,6 +49,8 @@ func wrappedMain(kill system.KillChannel) error {
 
 	server.Use(mpanic.New())
 	//server.Use(logger.Logger())
+
+	server.Use(cors.CORS())
 
 	server.Get("/", func(ctx *httpcontext.Context, next httpcontext.HandlerFunc) error {
 

@@ -400,9 +400,11 @@ func (r *Router) ServeHTTPContext(ctx *httpcontext.Context) error {
 
 	if req.Method == "OPTIONS" {
 		// Handle OPTIONS requests
+
 		if r.HandleOPTIONS {
 			if allow := r.allowed(path, req.Method); len(allow) > 0 {
 				ctx.Header().Set("Allow", allow)
+				ctx.SetStatusCode(strong.StatusNoContent)
 				return nil
 			}
 		}
